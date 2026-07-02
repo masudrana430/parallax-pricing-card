@@ -4,6 +4,10 @@ A premium, responsive, and interactive pricing component built for the Parallax 
 
 The project includes monthly and annual billing options, animated price transitions, light and dark themes, reusable components, responsive layouts, and accessible interactions.
 
+## Live Demo
+
+🔗 [View the live project](https://parallax-pricing-card.vercel.app/)
+
 ![Parallax Pricing dark theme](./public/preview-dark.png)
 
 ## Live Demo
