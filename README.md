@@ -1,3 +1,11 @@
+# Astra
+
+A full-stack astronaut health monitoring research prototype. See [Astra setup, features and limitations](README-ASTRA.md) for the Next.js frontend, FastAPI backend, optional AI/voice configuration, and deployment instructions.
+
+The original pricing-card project notes are preserved below.
+
+---
+
 # Parallax Pricing
 
 A premium, responsive, and interactive pricing component built for the Parallax Labs Frontend Developer Intern technical screening.

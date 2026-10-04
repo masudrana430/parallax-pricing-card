@@ -1,0 +1,41 @@
+services:
+  web:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      BACKEND_URL: http://api:8000
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}
+    depends_on:
+      - api
+    restart: unless-stopped
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://astra:${POSTGRES_PASSWORD:-local-dev-only}@db:5432/astra
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-6-astra}
+      TRANSCRIPTION_MODEL: ${TRANSCRIPTION_MODEL:-gpt-transcribe}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: astra
+      POSTGRES_USER: astra
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-dev-only}
+    volumes:
+      - health-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U astra"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+volumes:
+  health-data:

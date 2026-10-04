@@ -1,44 +1,20 @@
 import type { Metadata } from "next";
-import { Manrope, Space_Grotesk } from "next/font/google";
-
-import { ThemeProvider } from "@/components/providers/ThemeProvider";
-
+import "@fontsource/noto-sans-bengali/bengali-400.css";
+import "@fontsource/noto-sans-bengali/bengali-600.css";
+import "@fontsource/noto-sans-devanagari/devanagari-400.css";
+import "@fontsource/noto-sans-devanagari/devanagari-600.css";
 import "./globals.css";
-
-const manrope = Manrope({
-  subsets: ["latin"],
-  variable: "--font-body",
-  display: "swap",
-});
-
-const spaceGrotesk = Space_Grotesk({
-  subsets: ["latin"],
-  variable: "--font-display",
-  display: "swap",
-});
-
 export const metadata: Metadata = {
-  title: "Parallax Pricing",
+  title: "Astra · Your Mission Health Companion",
   description:
-    "A responsive and interactive SaaS pricing experience built with Next.js, TypeScript, Tailwind CSS and Motion.",
+    "A personal astronaut health monitoring workspace with multilingual symptom reporting. Research prototype.",
 };
-
-type RootLayoutProps = Readonly<{
-  children: React.ReactNode;
-}>;
-
 export default function RootLayout({
   children,
-}: RootLayoutProps) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html
-      lang="en"
-      suppressHydrationWarning
-      className={`${manrope.variable} ${spaceGrotesk.variable}`}
-    >
-      <body>
-        <ThemeProvider>{children}</ThemeProvider>
-      </body>
+    <html lang="en">
+      <body>{children}</body>
     </html>
   );
 }
