@@ -357,7 +357,7 @@ export function ProfileForm({
             <strong>Enable external AI processing</strong>
             <small>
               When AI is configured, symptom text and relevant health context
-              are sent to OpenAI. Recorded audio is sent only when you request
+              are sent to the configured AI service. Recorded audio is sent only when you request
               transcription. Audio is not stored by Astra. Leave this off to use
               guided mode.
             </small>

@@ -33,6 +33,8 @@ async function proxy(
       );
   }
   const headers = new Headers();
+  if (process.env.BACKEND_PROXY_SECRET)
+    headers.set("x-astra-proxy", process.env.BACKEND_PROXY_SECRET);
   for (const name of ["content-type", "cookie"]) {
     const value = request.headers.get(name);
     if (value) headers.set(name, value);
@@ -72,7 +74,7 @@ async function proxy(
     return Response.json(
       {
         detail:
-          "The health service is unavailable. No report was saved. Try again; seek medical help directly for urgent symptoms.",
+          "The health service is unavailable. Saving could not be confirmed; check your records before retrying. Seek medical help directly for urgent symptoms.",
       },
       { status: 503 },
     );

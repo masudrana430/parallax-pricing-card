@@ -146,3 +146,79 @@ def test_unconsented_data_not_sent_to_ai(monkeypatch):
     monkeypatch.setattr(agent,'AsyncOpenAI',forbidden)
     result=asyncio.run(agent.assess(Message(text='I feel dizzy'),{'ai_consent':False},[]))
     assert result['mode']=='guided'
+
+def test_proxy_secret_rejects_direct_access(client, monkeypatch):
+    monkeypatch.setenv('BACKEND_PROXY_SECRET', 'synthetic-test-secret')
+    assert client.get('/health').status_code == 200
+    assert client.get('/me').status_code == 403
+    assert client.get('/me', headers={'x-astra-proxy':'synthetic-test-secret'}).status_code == 401
+    assert client.get('/ready').status_code == 200
+
+def test_schema_migration_is_idempotent_and_preserves_records():
+    from backend.migrate import upgrade
+    from sqlalchemy import text
+    engine = create_engine('sqlite://')
+    assert upgrade(engine) == 1
+    with engine.begin() as c:
+        c.execute(text("INSERT INTO users (id,email,password_hash,profile,demo) VALUES ('test','test@example.com','hash','{}',0)"))
+    assert upgrade(engine) == 1
+    with engine.begin() as c:
+        assert c.scalar(text('SELECT count(*) FROM users')) == 1
+        c.execute(text('INSERT INTO schema_version (version) VALUES (99)'))
+    with pytest.raises(RuntimeError):
+        upgrade(engine)
+
+def test_ollama_structured_extraction(monkeypatch):
+    import json
+    class LocalClient:
+        def __init__(self, **kwargs): pass
+        async def __aenter__(self): return self
+        async def __aexit__(self, *args): pass
+        async def post(self, url, json):
+            assert url.endswith('/api/chat') and json['format']['type'] == 'object'
+            payload = {'symptoms':[{'code':'dizziness','quote':'unsteady','affirmed':True,'current':True,'subject':'user'}], 'summary':'ignored', 'questions':[]}
+            return SimpleNamespace(raise_for_status=lambda:None, json=lambda:{'message':{'content':__import__('json').dumps(payload)}})
+    monkeypatch.setenv('AI_PROVIDER', 'ollama')
+    monkeypatch.setattr(agent.httpx, 'AsyncClient', LocalClient)
+    response=asyncio.run(agent.assess(Message(text='I feel unsteady'), {'ai_consent':True}, []))
+    assert response['mode']=='ai' and response['urgency']=='review'
+    assert response['summary']!='ignored'
+
+def test_severe_report_bypasses_local_model(monkeypatch):
+    monkeypatch.setenv('AI_PROVIDER','ollama')
+    def forbidden(**kwargs): raise AssertionError('Emergency must not wait for AI')
+    monkeypatch.setattr(agent.httpx,'AsyncClient',forbidden)
+    response=asyncio.run(agent.assess(Message(text='New symptoms',severity=9), {'ai_consent':True}, []))
+    assert response['urgency']=='emergency' and response['provider_status']!='unavailable'
+
+def test_ollama_requires_consent(monkeypatch):
+    monkeypatch.setenv('AI_PROVIDER','ollama')
+    def forbidden(**kwargs): raise AssertionError('No model call without consent')
+    monkeypatch.setattr(agent.httpx,'AsyncClient',forbidden)
+    response=asyncio.run(agent.assess(Message(text='New symptoms'), {'ai_consent':False}, []))
+    assert response['mode']=='guided' and response['provider_status']=='consent_required'
+
+def test_ollama_failure_is_visible(monkeypatch):
+    monkeypatch.setenv('AI_PROVIDER','ollama')
+    def unavailable(**kwargs): raise RuntimeError('provider failure must not leak')
+    monkeypatch.setattr(agent.httpx,'AsyncClient',unavailable)
+    response=asyncio.run(agent.assess(Message(text='New symptoms'), {'ai_consent':True}, []))
+    assert response['mode']=='guided' and response['provider_status']=='unavailable'
+    assert 'provider failure' not in str(response)
+
+def test_readiness_detects_missing_schema(monkeypatch):
+    isolated=create_engine('sqlite://',connect_args={'check_same_thread':False},poolclass=StaticPool)
+    def empty_database():
+        from sqlalchemy.orm import Session
+        with Session(isolated) as c: yield c
+    main.app.dependency_overrides[main.db]=empty_database
+    try:
+        with TestClient(main.app) as c:
+            assert c.get('/ready').status_code==503
+    finally:
+        main.app.dependency_overrides.clear()
+
+def test_production_refuses_sqlite():
+    import subprocess, sys
+    result=subprocess.run([sys.executable,'-c','import backend.main'],env={**os.environ,'APP_ENV':'production','DATABASE_URL':'sqlite://','BACKEND_PROXY_SECRET':'test'},capture_output=True,text=True)
+    assert result.returncode!=0 and 'Production requires PostgreSQL' in result.stderr

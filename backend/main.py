@@ -11,15 +11,22 @@ from datetime import datetime, timedelta, timezone
 from fastapi import FastAPI, Depends, File, Form, HTTPException, Request, Response, UploadFile
 from fastapi.responses import JSONResponse
 from openai import AsyncOpenAI
-from sqlalchemy import JSON, Column, Float, Integer, String, create_engine, select
+from sqlalchemy import JSON, Column, Float, Integer, String, create_engine, select, text
 from sqlalchemy.orm import declarative_base, sessionmaker
-from .agent import SOURCES, assess
+from .agent import SOURCES, assess, ai_configured
 from .schemas import Credentials, Language, Message, Observation, Profile
 
 DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///./astra.db')
+if DATABASE_URL.startswith('postgres://'):
+    DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+if os.getenv('APP_ENV') == 'production':
+    if not DATABASE_URL.startswith(('postgresql://', 'postgresql+psycopg://')):
+        raise RuntimeError('Production requires PostgreSQL DATABASE_URL')
+    if not os.getenv('BACKEND_PROXY_SECRET'):
+        raise RuntimeError('Production requires BACKEND_PROXY_SECRET')
 if DATABASE_URL.startswith('postgresql://'):
     DATABASE_URL = DATABASE_URL.replace('postgresql://', 'postgresql+psycopg://', 1)
-engine = create_engine(DATABASE_URL, connect_args={'check_same_thread': False} if DATABASE_URL.startswith('sqlite') else {})
+engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_recycle=300, connect_args={'check_same_thread': False} if DATABASE_URL.startswith('sqlite') else {})
 DB = sessionmaker(bind=engine, expire_on_commit=False)
 Base = declarative_base()
 
@@ -47,7 +54,8 @@ class Record(Base):
 
 @asynccontextmanager
 async def lifespan(app):
-    Base.metadata.create_all(engine)
+    if os.getenv('APP_ENV') != 'production':
+        Base.metadata.create_all(engine)
     yield
 
 app = FastAPI(title='Astra Health Monitoring API', version='1.0.0', lifespan=lifespan)
@@ -55,6 +63,10 @@ limits = defaultdict(deque)
 
 @app.middleware('http')
 async def protections(request: Request, call_next):
+    secret = os.getenv('BACKEND_PROXY_SECRET')
+    if secret and request.url.path not in ('/health', '/ready'):
+        if not hmac.compare_digest(request.headers.get('x-astra-proxy', ''), secret):
+            return JSONResponse({'detail': 'Use the Astra frontend'}, status_code=403)
     if request.method != 'GET':
         bucket = (request.client.host if request.client else 'unknown', request.url.path)
         now = time.monotonic()
@@ -66,7 +78,11 @@ async def protections(request: Request, call_next):
             return JSONResponse({'detail': 'Too many requests. Try again shortly.'}, status_code=429)
         attempts.append(now)
         length = request.headers.get('content-length')
-        if length and int(length) > 11*1024*1024:
+        try:
+            oversized = length and int(length) > 11*1024*1024
+        except ValueError:
+            return JSONResponse({'detail': 'Invalid content length'}, status_code=400)
+        if oversized:
             return JSONResponse({'detail': 'Request too large'}, status_code=413)
     response = await call_next(request)
     response.headers['Cache-Control'] = 'no-store'
@@ -123,7 +139,16 @@ def records(connection, user_id, kind=None, limit=200):
 
 @app.get('/health')
 def health():
-    return {'status': 'ok', 'ai_configured': bool(os.getenv('OPENAI_API_KEY')), 'voice_configured': bool(os.getenv('OPENAI_API_KEY')), 'clinical_status': 'prototype'}
+    return {'status': 'ok', 'ai_configured': ai_configured(), 'voice_configured': bool(os.getenv('OPENAI_API_KEY')), 'clinical_status': 'prototype'}
+
+@app.get('/ready')
+def ready(connection=Depends(db)):
+    try:
+        connection.execute(text('SELECT 1'))
+        connection.execute(select(User.id).limit(1))
+        return {'status': 'ready'}
+    except Exception:
+        return JSONResponse({'status': 'unavailable'}, status_code=503)
 
 @app.post('/auth/register')
 def register(body: Credentials, response: Response, connection=Depends(db)):
@@ -186,7 +211,7 @@ def dashboard(user=Depends(current_user), connection=Depends(db)):
     reports = [serialize(r) for r in records(connection, user.id, 'report')]
     return {'user': public_user(user), 'observations': observations, 'reports': reports, 'latest': observations[0] if observations else None,
         'alerts': [r for r in reports if r['assessment']['urgency'] in ('emergency','review') and not r.get('acknowledged')],
-        'ai_configured': bool(os.getenv('OPENAI_API_KEY'))}
+        'ai_configured': ai_configured(), 'voice_configured': bool(os.getenv('OPENAI_API_KEY'))}
 
 @app.post('/observations')
 def observation(body: Observation, user=Depends(current_user), connection=Depends(db)):

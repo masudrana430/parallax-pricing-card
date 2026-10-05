@@ -63,6 +63,7 @@ export type Dashboard = {
   latest: Observation | null;
   alerts: Report[];
   ai_configured: boolean;
+  voice_configured: boolean;
 };
 export const languages: { code: Language; label: string }[] = [
   { code: "en", label: "English" },

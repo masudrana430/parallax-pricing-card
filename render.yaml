@@ -1,0 +1,23 @@
+# Review your Render plan before deployment. Database URL is supplied by you.
+services:
+  - type: web
+    name: astra-api
+    runtime: python
+    plan: free
+    branch: main
+    buildCommand: pip install -r backend/requirements-minimal.txt
+    startCommand: python -m backend.migrate && uvicorn backend.main:app --host 0.0.0.0 --port $PORT --workers 1
+    healthCheckPath: /ready
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: APP_ENV
+        value: production
+      - key: COOKIE_SECURE
+        value: 'true'
+      - key: DATABASE_URL
+        sync: false
+      - key: BACKEND_PROXY_SECRET
+        generateValue: true
+      - key: AI_PROVIDER
+        value: openai

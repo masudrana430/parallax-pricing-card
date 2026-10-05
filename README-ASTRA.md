@@ -6,6 +6,8 @@ Working full-stack research prototype: Next.js 16 / React 19 / TypeScript fronte
 
 [Landing page](docs/astra-landing.png) · [Mobile preview](docs/astra-mobile.png)
 
+Deployment guide: [Render backend + PostgreSQL + Vercel frontend](DEPLOYMENT.md).
+
 ## Implemented
 
 - Email/password registration and sign-in, hashed passwords, HttpOnly session cookies, logout, and per-user records.
@@ -62,7 +64,7 @@ Copy `backend/.env.example` to `backend/.env`, configure your backend provider k
 
 Set `OPENAI_API_KEY`, `OPENAI_MODEL` and `TRANSCRIPTION_MODEL`. Model access depends on your account. No provider key is included. Real provider inference/transcription is not verified by tests; mock tests cover success/failure boundaries. Default models follow the official documentation checked during implementation and are configurable.
 
-Enable external AI processing in the user's profile. Only then may symptom reports and selected relevant context be sent to OpenAI. Responses calls use `store=False`; this alone is not a provider-wide zero-retention guarantee. Configure the provider's data controls to meet your deployment requirements. Never expose a provider key through `NEXT_PUBLIC_` variables.
+Enable external AI processing in the user's profile. Only then may symptom reports and selected relevant context be sent to the configured provider. Responses calls use `store=False`; this alone is not a provider-wide zero-retention guarantee. Configure the provider's data controls to meet your deployment requirements. Never expose a provider key through `NEXT_PUBLIC_` variables.
 
 ## Docker Compose
 
@@ -85,7 +87,7 @@ npm run build
 
 Tests use an isolated in-memory database and no real provider calls. They cover session authentication, user isolation, input validation, exports, report acknowledgements, explicit multilingual warning phrases, basic negation, consent, unavailable transcription, provider failures and protection against fabricated extraction evidence.
 
-Development verification passed: 20 backend tests, lint, type checking and production build. A Chromium browser check against the production frontend and backend verified signup, profile saving, check-in persistence after reload, symptom reporting, guided responses, Bangla escalation, review acknowledgement, JSON download, mobile navigation and account isolation. No browser runtime errors were observed. The proxy's origin protection and route allowlist were also checked. Preview images show synthetic demo records. Bengali and Devanagari fonts are bundled with the frontend.
+Development verification passed: 28 backend tests, lint, type checking and production build. A Chromium browser check against the production frontend and backend verified signup, profile saving, check-in persistence after reload, symptom reporting, guided responses, Bangla escalation, review acknowledgement, JSON download, mobile navigation and account isolation. No browser runtime errors were observed. The proxy's origin protection and route allowlist were also checked. Preview images show synthetic demo records. Bengali and Devanagari fonts are bundled with the frontend.
 
 ## Medical and operational limits
 
@@ -93,8 +95,8 @@ This is a research prototype, not a clinically validated device, diagnostic syst
 
 The guided matcher is deliberately limited and can miss or misinterpret symptoms. AI extraction can also be wrong. No reassuring "all clear" result is generated. Unknown results require further assessment. The severity escalation is a conservative prototype policy, not a validated triage algorithm. Public NHS information is Earth-based; operational guidance needs flight-surgeon review, mission-specific protocol approval, validated translations and clinical testing. No clinical accuracy percentage is claimed.
 
-The app runs with locally stored records when installed with its backend. Guided text responses work without a provider; local LLM inference, offline voice transcription, network outage queuing and spacecraft telemetry are future work. Production also needs database migrations, robust shared rate limiting, account recovery, retention controls and a reviewed security/clinical deployment process.
+The app runs with locally stored records when installed with its backend. Guided text responses work without a provider; offline voice transcription, network outage queuing and spacecraft telemetry are future work. Versioned database initialization and optional Ollama extraction are implemented; production still needs robust shared rate limiting, account recovery, retention controls and a reviewed security/clinical deployment process.
 
 References: [NASA autonomous medical operations](https://www.nasa.gov/directorates/stmd/game-changing-development-program/autonomous-medical-operations-amo/), [NHS chest pain](https://www.nhs.uk/symptoms/chest-pain/), [NHS breathing symptoms](https://www.nhs.uk/symptoms/shortness-of-breath/), [NHS dizziness](https://www.nhs.uk/symptoms/dizziness/), [OpenAI structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs).
 
-The original pricing component remains in `src/components/pricing`; the default page on the `astra-build` branch is Astra. The repository name itself has not been changed.
+The original pricing component remains in `src/components/pricing`; the default page on `main` is Astra. The repository name itself has not been changed.

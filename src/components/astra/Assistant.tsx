@@ -164,7 +164,7 @@ export function Assistant({
     },
     [],
   );
-  const voiceAvailable = data.ai_configured && data.user.profile.ai_consent;
+  const voiceAvailable = data.voice_configured && data.user.profile.ai_consent;
   async function send(e: React.FormEvent) {
     e.preventDefault();
     if (voiceDraft && !confirmed) return;
