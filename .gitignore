@@ -39,3 +39,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+# Astra runtime data and Python environments
+.venv/
+__pycache__/
+*.pyc
+*.db
+*.db-*
+.pytest_cache/
+backend/.env
+!.env.example
+!backend/.env.example
